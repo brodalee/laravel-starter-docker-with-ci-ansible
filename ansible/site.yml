@@ -1,0 +1,7 @@
+---
+- hosts: fake-host
+  connection: local
+  run_once: true
+  gather_facts: false
+  roles:
+    - role: deploy_app

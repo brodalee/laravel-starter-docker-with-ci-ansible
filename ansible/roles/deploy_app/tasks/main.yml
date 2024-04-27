@@ -1,0 +1,8 @@
+---
+- name: Test
+  shell: echo "toto"
+  register: output
+
+- name: show
+  debug:
+    msg: "{{ output }}"

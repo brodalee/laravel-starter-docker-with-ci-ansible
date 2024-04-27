@@ -1,0 +1,85 @@
+version: '3.8'
+
+volumes:
+  postgresql:
+
+networks:
+  default:
+    driver: bridge
+
+services:
+  postgresql:
+    build:
+      context: ./docker/postgresql
+    container_name: laravel_app_database
+    image: postgres:12
+    restart: always
+    volumes:
+      - type: volume
+        source: postgresql
+        target: "/var/lib/postgresql/data"
+
+    environment:
+      POSTGRES_DB: "database"
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_USER: "laravel"
+    ports:
+      - 5432:5432
+    networks:
+      - default
+
+  phpfpm:
+    build:
+      context: .
+    container_name: laravel_php-fpm
+    #env_file:
+    #  - .env
+    environment:
+      TERM: xterm-color
+    cap_add:
+      - SYS_PTRACE
+    volumes:
+      - type: "bind"
+        source: "./app/"
+        target: "/project"
+      - type: "bind"
+        source: "../"
+        target: "/workspace"
+    networks:
+      - default
+
+  nginx:
+    build:
+      context: docker/nginx
+    container_name: laravel_nginx
+    ports:
+      - 8080:80
+    environment:
+      TERM: xterm-color
+      VIRTUAL_PORT: 8080
+      VIRTUAL_HOST: "my-app.local"
+    cap_add:
+      - SYS_PTRACE
+    volumes:
+      - type: bind
+        source: "./app/"
+        target: "/project"
+      - type: bind
+        source: "../"
+        target: "/workspace"
+      - type: bind
+        source: "./docker/nginx/nginx.conf"
+        target: "/etc/nginx/nginx.conf"
+      - type: bind
+        source: "./docker/nginx/phpfpm.conf"
+        target: "/etc/nginx/conf.d/phpfpm.conf"
+      - type: bind
+        source: "./docker/nginx/laravel.dev.conf"
+        target: "/etc/nginx/conf.d/default.conf"
+      - type: bind
+        source: "./docker/nginx/static_errors.conf"
+        target: "/etc/nginx/static_errors.conf"
+    depends_on:
+      - phpfpm
+    networks:
+      - default

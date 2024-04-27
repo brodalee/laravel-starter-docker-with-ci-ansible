@@ -1,0 +1,6 @@
+---
+collections:
+  - name: cloud.common
+    version: 2.1.2
+  - name: community.general
+    version: 8.1.0

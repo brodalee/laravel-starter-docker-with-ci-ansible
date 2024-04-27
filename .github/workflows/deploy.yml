@@ -1,0 +1,82 @@
+name: DEPLOY
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+defaults:
+  run:
+    working-directory: ./
+
+jobs:
+  tests_with_coverage:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          clean: false
+          ref: ${{ github.head_ref }}
+
+      - uses: "shivammathur/setup-php@v2"
+        with:
+          php-version: "8.3.4"
+          extensions: pdo, pdo_mysql
+
+      - uses: "ramsey/composer-install@v2"
+        with:
+          working-directory: "./app"
+
+      - name: generate Key
+        working-directory: ./app
+        run: cp .env.ci .env && php artisan key:generate
+
+      - name: Run Tests
+        working-directory: ./app
+        run: composer run coverage-xml
+  ecs:
+    runs-on: ubuntu-20.04
+    needs: [ tests_with_coverage ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          clean: false
+          ref: ${{ github.head_ref }}
+
+      - uses: "ramsey/composer-install@v2"
+        with:
+          working-directory: "./app"
+
+      - name: Ecs checker
+        working-directory: ./app
+        run: composer run ecs
+
+  deploy:
+    runs-on: ubuntu-20.04
+    needs: [ ecs ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          clean: false
+          ref: ${{ github.head_ref }}
+
+      - name: Get Vault
+        working-directory: ./ansible
+        # TODO : fill test by ansible vault from secrets.
+        run: echo "test" >> .ansible_vault_password
+
+      - name: Ansible
+        uses: RvuvuzelaM/ansible-cli-github-action@1
+        with:
+          command: cd ansible && ansible-galaxy collection install --force -r requirements.yml && ansible-playbook site.yml --inventory inventories/dev --vault-password-file .ansible_vault_password --verbose
+
+      - name: Clean
+        working-directory: ./ansible
+        run: rm .ansible_vault_password
